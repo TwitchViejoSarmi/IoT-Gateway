@@ -17,6 +17,7 @@ def get_s3_session():
     session = boto3.Session(
         aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
         aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        aws_session_token=os.getenv("AWS_SESSION_TOKEN"),
         region_name=os.getenv("AWS_REGION")
     )
 
@@ -55,6 +56,7 @@ def insert_data(data:dict, conn, cur):
 
     # Commit the changes.
     conn.commit()
+    print(f"Inserted {data}")
 
 def get_json_files(bucket_name:str, session):
     """
@@ -72,18 +74,18 @@ def get_json_files(bucket_name:str, session):
         # Get each file.
         for obj in response["Contents"]:
             file = obj["Key"]
-            file_data = obj["Body"]
+            file_data = s3.get_object(Bucket=bucket_name, Key=file)
             extension = Path(file).suffix.lower()
 
             if extension == ".json":
-
-                # Create the folder if doesn't exists.
-                os.makedirs("outputs",exist_ok=True)
-
                 # Get the file content and convert it to dictionary.
-                content = file_data.read().decode("utf-8")
-                data = json.loads(content)
-                insert_data(data, conn, cur)
+                content = file_data["Body"].read().decode("utf-8")
+                data = json.loads(content)["measurements"]
+                for register in data:
+                    print(register)
+                    insert_data(register, conn, cur)
     else:
         print("No files detected...")
 
+session = get_s3_session()
+get_json_files("mys3wetahhbucket", session)
